@@ -1,0 +1,50 @@
+{
+    "greeting": {
+        "patterns": [
+            "hi",
+            "hello",
+            "hey",
+            "holla",
+            "greetings",
+            "what's up"
+        ],
+        "responses": [
+            "Thanks for checking in.",
+            "Thank you for being there!",
+            "Hi there, how can I help you?",
+            "Hello, how can I help you?"
+        ]
+    },
+    "goodbye": {
+        "patterns": [
+            "bye",
+            "goodbye",
+            "see you later",
+            "see you",
+            "have a nice day"
+        ],
+        "responses": [
+            "Have a nice time, bye.",
+            "Thank you for using this service. Goodbye",
+            "See you later, bye.",
+            "Have a nice day, bye."
+        ]
+    },
+    "thanks": {
+        "patterns": [
+            "thanks",
+            "thank",
+            "thank you",
+            "thx",
+            "thank you very much"
+        ],
+        "responses": [
+            "Happy to help!",
+            "Any time!",
+            "You're welcome",
+            "My pleasure",
+            "No problem!",
+            "Don't mention it!"
+        ]
+    }
+}
