@@ -19,6 +19,7 @@ collections.Mapping = collections.abc.Mapping
 
 from nlp import check_ticket, extract_date_info, extract_destination_info, extract_time_info
 from reasoning import get_response
+from ticket import get_journeys, parse_journeys, find_cheapest
 
 from experta import *         # expert system library used for ticket rules
 
@@ -487,3 +488,29 @@ def process_input(user_input, journey):
         journey["return_time"] = time_info["return_time"]
 
     return get_response(journey)
+
+def find_cheapest_ticket():
+
+    origin_code = railway_stations[journey["from"]]
+    dest_code = railway_stations[journey["to"]]
+
+    # convert date string → datetime (basic version)
+    departure_dt = datetime.now()
+
+    journeys = get_journeys(origin_code, dest_code, departure_dt)
+
+    parsed = parse_journeys(journeys)
+
+    best = find_cheapest(parsed)
+
+    return f"""
+BOT: Here's the best option I found:
+
+From: {journey['from'].title()} → {journey['to'].title()}
+Departure: {best['departure'].strftime('%H:%M')}
+Arrival: {best['arrival'].strftime('%H:%M')}
+
+Price: {"£" + str(best['price']) if best['price'] else "Not available"}
+
+(You can proceed to booking via the provider site)
+"""

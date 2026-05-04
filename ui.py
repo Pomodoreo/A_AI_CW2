@@ -27,6 +27,10 @@ class ChatBubble(QFrame):
         message = QLabel(text)
         message.setWordWrap(True)
         message.setMaximumWidth(300)
+        
+        message.setTextFormat(Qt.TextFormat.RichText)
+        message.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        message.setOpenExternalLinks(True)
 
         if is_user:
             bubble = QFrame()

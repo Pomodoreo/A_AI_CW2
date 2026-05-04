@@ -1,5 +1,7 @@
 # This is for deciding what the chatbot is going to say
 from experta import *
+from ticket import get_journeys, parse_journeys, find_cheapest
+from datetime import datetime
 
 class Session(Fact):
     pass
@@ -59,6 +61,22 @@ class TrainBooker(KnowledgeEngine):
     def ready(self, start, end, date, ticket):
         if self.response is None:
             self.response = f"Booking {ticket} ticket from {start} to {end} on {date}"
+            
+def is_ready(journey):
+    # must always have these
+    if not all([
+        journey["from"],
+        journey["to"],
+        journey["date"],
+        journey["ticket_type"]
+    ]):
+        return False
+
+    # extra requirement for returns
+    if journey["ticket_type"] == "return":
+        return journey["return_date"] is not None
+
+    return True
 
 def get_response(journey): #Function to actually request response
     engine = TrainBooker()
@@ -75,5 +93,96 @@ def get_response(journey): #Function to actually request response
     ))
 
     engine.run()
+    
+    #Check if ready
+    if is_ready(journey):
+
+        try:
+            return fetch_ticket(journey)
+        except Exception as e:
+            print("DEBUG ERROR:", e)
+            return f"BOT: I found your journey but couldn't retrieve ticket data."
 
     return engine.response
+
+def build_booking_link(origin, dest, journey, best_departure):
+    out_dt = best_departure
+
+    out_date = out_dt.strftime("%d%m%y")
+    out_time = out_dt.strftime("%H%M")
+
+    # BASE URL
+    base = f"https://ojp.nationalrail.co.uk/service/timesandfares/{origin}/{dest}/{out_date}/{out_time}/dep"
+
+    # HANDLE RETURN
+    if journey["ticket_type"] == "return" and journey["return_date"]:
+        ret_dt = journey["return_date"]
+
+        # merge return time if exists
+        if journey["return_time"]:
+            hour = int(journey["return_time"][:2])
+            minute = int(journey["return_time"][2:])
+            ret_dt = ret_dt.replace(hour=hour, minute=minute)
+        else:
+            ret_dt = ret_dt.replace(hour=9, minute=0)
+
+        ret_date = ret_dt.strftime("%d%m%y")
+        ret_time = ret_dt.strftime("%H%M")
+
+        return f"{base}/{ret_date}/{ret_time}/dep"
+
+    return base
+
+def fetch_ticket(journey):
+
+    from main import railway_stations  # or wherever it's stored
+
+    origin_code = railway_stations[journey["from"]]
+    dest_code = railway_stations[journey["to"]]
+
+    # basic date parsing
+    departure_dt = journey["date"]
+
+    # If time exists, merge it in
+    if journey["time"]:
+        hour = int(journey["time"][:2])
+        minute = int(journey["time"][2:])
+        departure_dt = departure_dt.replace(hour=hour, minute=minute)
+    else:
+        # fallback so you don’t send 00:00 trains like a psychopath
+        departure_dt = departure_dt.replace(hour=9, minute=0)
+
+    journeys = get_journeys(origin_code, dest_code, departure_dt)
+
+    if not journeys:
+        return "BOT: No journeys found."
+
+    parsed = parse_journeys(journeys, journey["ticket_type"])
+
+    # apply time filters (your coursework requirement)
+    if journey.get("time") == "before":
+        parsed = [j for j in parsed if j["departure"].hour < 10]
+
+    if journey.get("return_time") == "after":
+        parsed = [j for j in parsed if j["departure"].hour >= 14]
+
+    if not parsed:
+        return "BOT: No trains match your time preference."
+
+    best = find_cheapest(parsed)
+    link = build_booking_link(origin_code, dest_code, journey, best["departure"])
+    
+    return f"""
+BOT: Here's the best option I found:
+
+From: {journey['from'].title()} → {journey['to'].title()}
+Departure: {best['departure'].strftime('%H:%M')}
+Arrival: {best['arrival'].strftime('%H:%M')}
+
+Ticket: {best['fare_type']}
+Price: {"£" + str(best['price']) if best['price'] else "Check online"}
+
+Book here:
+<a href="{link}">Book this journey</a>
+
+"""
