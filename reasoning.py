@@ -197,8 +197,8 @@ class TrainBooker(KnowledgeEngine):
             date=MATCH.date     & P(lambda x: x is not None),
             ticket=MATCH.ticket & P(lambda x: x in ['one way', 'open ticket']),
             time=MATCH.time     & P(lambda x: x is not None),
-            from_options=P(lambda x: x is None),
-            to_options=P(lambda x: x is None),
+            # from_options=P(lambda x: x is None),
+            # to_options=P(lambda x: x is None),
             journey=MATCH.journey
         ),
         salience=15
@@ -232,8 +232,8 @@ class TrainBooker(KnowledgeEngine):
             time=MATCH.time             & P(lambda x: x is not None),
             return_date=MATCH.ret_date  & P(lambda x: x is not None),
             return_time=MATCH.ret_time  & P(lambda x: x is not None),
-            from_options=P(lambda x: x is None),
-            to_options=P(lambda x: x is None),
+            # from_options=P(lambda x: x is None),
+            # to_options=P(lambda x: x is None),
             journey=MATCH.journey
         ),
         salience=15
