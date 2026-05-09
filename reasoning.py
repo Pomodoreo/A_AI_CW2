@@ -8,6 +8,35 @@ from experta import *
 from ticket import get_journeys, parse_journeys, find_cheapest
 from datetime import datetime
 
+
+def list_check(x):
+    if x is None:
+        return False
+    if not isinstance(x, list):
+        return False
+    return len(x) > 1
+
+
+def unambiguous(x):
+    if x is None:
+        return True
+    if not isinstance(x, list):
+        return False
+    return len(x) <= 1
+
+
+def not_none(x):
+    return x is not None
+
+
+def is_return_ticket(x):
+    return x in ['return', 'open return']
+
+
+def is_single_ticket(x):
+    return x in ['one way', 'open ticket']
+
+
 class Session(Fact):
     """
     This holds the current state of the booking conversation as a single Fact.
@@ -39,32 +68,35 @@ class TrainBooker(KnowledgeEngine):
     # This fires when NLP found multiple possible station matches so the user can disambiguate before moving move on
 
     @Rule(
-        Session(from_options=MATCH.opts & P(lambda x: x is not None and isinstance(x, list) and len(x) > 1)),
+        Session(from_options=MATCH.opts & P(list_check)),
         salience=130
     )
     def clarify_start(self, opts):
         if self.response is None:
-            # There is a cap at 6 to avoid wall of text
-            listed = "\n  - ".join(opts[:6])
+            station_list = ""
+            for station in opts[:6]:
+                station_list += "\n - " + station
             self.response = (
-                "I found several stations that could be your departure point. "
-                "Which one did you mean?\n  - " + listed + "\n\n"
-                "(Just type the name or its station code.)"
+                    "I found several stations that could be your departure point. "
+                    "Which one did you mean?" + station_list + "\n\n"
+                    "(Type the name or its station code.)"
             )
-            
+
     @Rule(
         Session(
-            to_options=MATCH.opts & P(lambda x: x is not None and isinstance(x, list) and len(x) > 1)),
+            to_options=MATCH.opts & P(list_check)),
         salience=120
     )
     def clarify_destination(self, opts):
         if self.response is None:
-            listed = "\n  - ".join(opts[:6])
+            station_list = ""
+            for station in opts[:6]:
+                station_list += "\n - " + station
             self.response = (
-            "I found several stations that could be your destination. "
-            "Which one did you mean?\n  - " + listed + "\n\n"
-            "(Just type the name or its station code.)"
-        )
+                    "I found several stations that could be your destination. "
+                    "Which one did you mean?" + station_list + "\n\n"
+                    "(Type the name or its station code.)"
+            )
 
     # Missing Info Rules (salience 100–50)
     # Each rule only fires when earlier steps are complete
@@ -74,9 +106,7 @@ class TrainBooker(KnowledgeEngine):
     @Rule(
         Session(
             start=None,
-            from_options=P(
-                lambda x: x is None or (isinstance(x, list) and len(x) <= 1)
-            )
+            from_options=P(unambiguous)
         ),
         salience=100
     )
@@ -87,43 +117,35 @@ class TrainBooker(KnowledgeEngine):
     # Destination station
     @Rule(
         Session(
-            start=MATCH.start & P(lambda x: x is not None),
+            start=MATCH.start & P(not_none),
             end=None,
-            to_options=P(lambda x: x is None or (isinstance(x, list) and len(x) <= 1))
+            to_options=P(unambiguous)
         ),
         salience=90
     )
     def ask_destination(self, start):
         if self.response is None:
-            self.response = (
-                "Got it, departing from " + start.title() + ".\n"
-                "Where would you like to travel to?"
-            )
+            self.response = ("Got it, departing from " + start.title() + ".\n""Where would you like to travel to?")
 
     
     # Ticket type
     @Rule(
         Session(
-            start=MATCH.s & P(lambda x: x is not None),
-            end=MATCH.e & P(lambda x: x is not None),
+            start=MATCH.s & P(not_none),
+            end=MATCH.e & P(not_none),
             ticket=None
         ),
         salience=80
     )
     def ask_ticket(self, s, e):
         if self.response is None:
-            self.response = (
-            "Is this a one-way or return journey from "
-            + s.title() + " to " + e.title() + "?\n"
-            "  - one way\n  - return\n  - open return"
-        )
-
+            self.response = ("Is this a one-way or return journey from "+ s.title() + " to " + e.title() + "?\n""  - one way\n  - return\n  - open return")
     # Outbound date
     @Rule(
         Session(
-            start=MATCH.s & P(lambda x: x is not None),
-            end=MATCH.e & P(lambda x: x is not None),
-            ticket=MATCH.t & P(lambda x: x is not None),
+            start=MATCH.s & P(not_none),
+            end=MATCH.e & P(not_none),
+            ticket=MATCH.t & P(not_none),
             date=None
         ),
         salience=70
@@ -140,10 +162,10 @@ class TrainBooker(KnowledgeEngine):
     # Asking for it explicitly covers this particular scenario
     @Rule(
         Session(
-            start=MATCH.s & P(lambda x: x is not None),
-            end=MATCH.e & P(lambda x: x is not None),
-            ticket=MATCH.t & P(lambda x: x is not None),
-            date=MATCH.d & P(lambda x: x is not None),
+            start=MATCH.s & P(not_none),
+            end=MATCH.e & P(not_none),
+            ticket=MATCH.t & P(not_none),
+            date=MATCH.d & P(not_none),
             time=None
         ),
         salience=60
@@ -158,7 +180,7 @@ class TrainBooker(KnowledgeEngine):
     # Return date (such as return / open return tickets only)
     @Rule(
         Session(
-            ticket=MATCH.t & P(lambda x: x in ['return', 'open return']),
+            ticket=MATCH.t & P(is_return_ticket),
             return_date=None
         ),
         salience=55
@@ -174,8 +196,8 @@ class TrainBooker(KnowledgeEngine):
     # Test case example: "come back from Oxford in the afternoon"
     @Rule(
         Session(
-            ticket=MATCH.t & P(lambda x: x in ['return', 'open return']),
-            return_date=MATCH.rd & P(lambda x: x is not None),
+            ticket=MATCH.t & P(is_return_ticket),
+            return_date=MATCH.rd & P(not_none),
             return_time=None
         ),
         salience=50
@@ -192,13 +214,11 @@ class TrainBooker(KnowledgeEngine):
 
     @Rule(
         Session(
-            start=MATCH.start   & P(lambda x: x is not None),
-            end=MATCH.end       & P(lambda x: x is not None),
-            date=MATCH.date     & P(lambda x: x is not None),
-            ticket=MATCH.ticket & P(lambda x: x in ['one way', 'open ticket']),
-            time=MATCH.time     & P(lambda x: x is not None),
-            # from_options=P(lambda x: x is None),
-            # to_options=P(lambda x: x is None),
+            start=MATCH.start & P(not_none),
+            end=MATCH.end & P(not_none),
+            date=MATCH.date & P(not_none),
+            ticket=MATCH.ticket & P(is_single_ticket),
+            time=MATCH.time & P(not_none),
             journey=MATCH.journey
         ),
         salience=15
@@ -208,32 +228,29 @@ class TrainBooker(KnowledgeEngine):
             time_fmt = _fmt_time(time)
             date_fmt = _fmt_date(date)
             self.response = (
-            "Great, I have everything I need. Here is your journey summary:\n\n"
-            "Ticket type: " + ticket.title() + "\n"
-            "From: " + start.title() + "\n"
-            "To: " + end.title() + "\n"
-            "Date: " + date_fmt + "\n"
-            "Depart: " + time_fmt + "\n\n"
-            "Searching for the cheapest available ticket..."
-        )
+                    "Great, I have everything I need. Here is your journey summary:\n\n"
+                    "Ticket type: " + ticket.title() + "\n"
+                    "From: " + start.title() + "\n"
+                    "To: " + end.title() + "\n"
+                    "Date: " + date_fmt + "\n"
+                    "Depart: " + time_fmt + "\n\n"
+                    "Searching for the cheapest available ticket..."
+            )
             try:
                 self.response = fetch_ticket(journey)
             except Exception as e:
                 print("DEBUG ERROR:", e)
-                self.response = f"BOT: I found your journey but couldn't retrieve ticket data."
-        
+                self.response = "BOT: I found your journey but couldn't retrieve ticket data."
 
     @Rule(
         Session(
-            start=MATCH.start           & P(lambda x: x is not None),
-            end=MATCH.end               & P(lambda x: x is not None),
-            date=MATCH.date             & P(lambda x: x is not None),
-            ticket=MATCH.ticket         & P(lambda x: x in ['return', 'open return']),
-            time=MATCH.time             & P(lambda x: x is not None),
-            return_date=MATCH.ret_date  & P(lambda x: x is not None),
-            return_time=MATCH.ret_time  & P(lambda x: x is not None),
-            # from_options=P(lambda x: x is None),
-            # to_options=P(lambda x: x is None),
+            start=MATCH.start & P(not_none),
+            end=MATCH.end & P(not_none),
+            date=MATCH.date & P(not_none),
+            ticket=MATCH.ticket & P(is_return_ticket),
+            time=MATCH.time & P(not_none),
+            return_date=MATCH.ret_date & P(not_none),
+            return_time=MATCH.ret_time & P(not_none),
             journey=MATCH.journey
         ),
         salience=15
@@ -257,7 +274,7 @@ class TrainBooker(KnowledgeEngine):
                 self.response = fetch_ticket(journey)
             except Exception as e:
                 print("DEBUG ERROR:", e)
-                self.response = f"BOT: I found your journey but couldn't retrieve ticket data."
+                self.response = "BOT: I found your journey but couldn't retrieve ticket data."
 
 
 
@@ -356,7 +373,7 @@ def get_response(journey): #Function to actually request response
     #         return fetch_ticket(journey)
     #     except Exception as e:
     #         print("DEBUG ERROR:", e)
-    #         return f"BOT: I found your journey but couldn't retrieve ticket data."
+    #         return "BOT: I found your journey but couldn't retrieve ticket data."
 
     # return engine.response
 
@@ -367,7 +384,7 @@ def build_booking_link(origin, dest, journey, best_departure):
     out_time = out_dt.strftime("%H%M")
 
     # BASE URL
-    base = f"https://ojp.nationalrail.co.uk/service/timesandfares/{origin}/{dest}/{out_date}/{out_time}/dep"
+    base = "https://ojp.nationalrail.co.uk/service/timesandfares/{}/{}/{}/{}/dep".format(origin, dest, out_date, out_time)
 
     # HANDLE RETURN
     if journey["ticket_type"] == "return" and journey["return_date"]:
@@ -384,7 +401,7 @@ def build_booking_link(origin, dest, journey, best_departure):
         ret_date = ret_dt.strftime("%d%m%y")
         ret_time = ret_dt.strftime("%H%M")
 
-        return f"{base}/{ret_date}/{ret_time}/dep"
+        return "{}/{}/{}/dep".format(base, ret_date, ret_time)
 
     return base
 
@@ -430,7 +447,7 @@ def fetch_ticket(journey):
     return f"""
 BOT: Here's the best option I found:
 
-From: {journey['from'].title()} → {journey['to'].title()}
+From: {journey['from'].title()} to {journey['to'].title()}
 Departure: {best['departure'].strftime('%H:%M')}
 Arrival: {best['arrival'].strftime('%H:%M')}
 
@@ -439,5 +456,4 @@ Price: {"£" + str(best['price']) if best['price'] else "Check online"}
 
 Book here:
 <a href="{link}">Book this journey</a>
-
 """
