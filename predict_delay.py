@@ -1,116 +1,161 @@
-from datetime import datetime, timedelta
-from pathlib import Path
-
-from model import predict_delay
+from model import predict_delay, time_to_minutes
 
 
-# Loads station names and station codes
+STATION_FILE = "data/uk_railway_stations.txt"
+
+ROUTE_STATIONS = [
+    "WAT",  # London Waterloo
+    "CLJ",  # Clapham Junction
+    "WIM",  # Wimbledon
+    "WOK",  # Woking
+    "BSK",  # Basingstoke
+    "WIN",  # Winchester
+    "SOU",  # Southampton Central
+    "BMH",  # Bournemouth
+    "POO",  # Poole
+    "WEY",  # Weymouth
+]
+
+
 def load_station_codes():
     stations = {}
 
-    file_path = Path("data/uk_railway_stations.txt")
-
-    with open(file_path) as file:
+    with open(STATION_FILE, "r", encoding="utf-8") as file:
         for line in file:
-            parts = line.strip().split(" | ")
+            if "|" not in line:
+                continue
 
-            if len(parts) == 2:
-                station_name = parts[0].lower()
-                station_code = parts[1].upper()
+            name, code = line.strip().split("|")
+            name = name.strip().upper()
+            code = code.strip().upper()
 
-                stations[station_name] = station_code
-                stations[station_code.lower()] = station_code
+            if code != "N/A":
+                stations[name] = code
+                stations[code] = code
+
+    stations["WATERLOO"] = "WAT"
+    stations["LONDON WATERLOO"] = "WAT"
+    stations["SOUTHAMPTON"] = "SOU"
+    stations["SOUTHAMPTON CENTRAL"] = "SOU"
+    stations["BOURNEMOUTH"] = "BMH"
+    stations["POOLE"] = "POO"
+    stations["WEYMOUTH"] = "WEY"
 
     return stations
 
 
-# full station name or code into station code
-def get_station_code(user_station, stations):
-    user_station = user_station.lower().strip()
-
-    if user_station in stations:
-        return stations[user_station]
-
-    for station_name, station_code in stations.items():
-        if user_station in station_name:
-            return station_code
-
-    return None
+def get_station_code(user_input, stations):
+    user_input = user_input.strip().upper()
+    return stations.get(user_input)
 
 
-# Adds delay to planned arrival time
-def add_delay_to_time(time_text, delay):
-    time_text = time_text.strip().replace(":", "")
+def get_route(start_code, destination_code):
+    if start_code not in ROUTE_STATIONS:
+        return None
 
-    if len(time_text) == 3:
-        time_text = "0" + time_text
+    if destination_code not in ROUTE_STATIONS:
+        return None
 
-    original_time = datetime.strptime(time_text, "%H%M")
-    new_time = original_time + timedelta(minutes=delay)
+    start_index = ROUTE_STATIONS.index(start_code)
+    destination_index = ROUTE_STATIONS.index(destination_code)
 
-    return new_time.strftime("%H:%M")
+    if start_index == destination_index:
+        return None
 
-#---------
-def get_delay_prediction(delay_info):
+    if start_index < destination_index:
+        return "WAT2WEY"
+
+    return "WEY2WAT"
+
+
+# Adds the predicted delay to the planned arrival time
+def get_final_arrival_time(planned_arrival_time, predicted_delay):
+    planned_minutes = time_to_minutes(planned_arrival_time)
+
+    if planned_minutes is None:
+        return None
+
+    final_minutes = planned_minutes + round(predicted_delay)
+    final_minutes = final_minutes % 1440
+
+    hours = final_minutes // 60
+    minutes = final_minutes % 60
+
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def main():
     stations = load_station_codes()
 
-    route = delay_info["route"]
-    current_station = delay_info["current_station"]
-    current_delay = delay_info["current_delay"]
-    planned_arrival = delay_info["planned_arrival"]
+    print("Train Delay Prediction")
+    print("----------------------")
+    print("Supported route: London Waterloo - Weymouth")
+    print("You can enter full station names or station codes.\n")
 
-    location_code = get_station_code(current_station, stations)
+    start_input = input("Current station: ")
+    destination_input = input("Destination station: ")
 
-    if location_code is None:
-        return {
-            "success": False,
-            "message": "Station not recognised."
-        }
+    start_code = get_station_code(start_input, stations)
+    destination_code = get_station_code(destination_input, stations)
+
+    if start_code is None:
+        print("Sorry, I could not recognise that current station.")
+        return
+
+    if destination_code is None:
+        print("Sorry, I could not recognise that destination station.")
+        return
+
+    if start_code not in ROUTE_STATIONS:
+        print("Sorry, delay prediction is not available for that current station.")
+        return
+
+    if destination_code not in ROUTE_STATIONS:
+        print("Sorry, delay prediction is not available for that destination station.")
+        return
+
+    route = get_route(start_code, destination_code)
+
+    if route is None:
+        print("The current station and destination cannot be the same.")
+        return
+
+    planned_arrival_time = input("Planned arrival time at destination, e.g. 15:45: ")
+
+    try:
+        current_delay = float(input("Current delay in minutes: "))
+    except ValueError:
+        print("Please enter the delay as a number.")
+        return
 
     predicted_delay = predict_delay(
         route,
-        location_code,
-        planned_arrival,
+        start_code,
+        planned_arrival_time,
         current_delay
     )
 
     if predicted_delay is None:
-        return {
-            "success": False,
-            "message": "Prediction could not be made. Please check the route, station or time."
-        }
+        print("Sorry, I could not make a prediction with the information provided.")
+        return
 
-    expected_arrival = add_delay_to_time(planned_arrival, predicted_delay)
+    final_arrival_time = get_final_arrival_time(
+        planned_arrival_time,
+        predicted_delay
+    )
 
-    return {
-        "success": True,
-        "route": route,
-        "current_station": current_station,
-        "station_code": location_code,
-        "current_delay": current_delay,
-        "predicted_delay": predicted_delay,
-        "planned_arrival": planned_arrival,
-        "expected_arrival": expected_arrival
-    }
+    if final_arrival_time is None:
+        print("Sorry, the planned arrival time was not valid.")
+        return
+
+    print(
+        "\nBased on the current delay, your train is expected to arrive at "
+        + destination_input.strip()
+        + " at approximately "
+        + final_arrival_time
+        + "."
+    )
 
 
-# Manual Test
 if __name__ == "__main__":
-
-    delay_info = {
-        "route": input("Route WEY2WAT or WAT2WEY: "),
-        "current_station": input("Current station name or code: "),
-        "current_delay": float(input("Current delay in minutes: ")),
-        "planned_arrival": input("Planned arrival time at destination, example 1435 or 14:35: ")
-    }
-
-    result = get_delay_prediction(delay_info)
-
-    if not result["success"]:
-        print("\n" + result["message"])
-    else:
-        print("\nCurrent station:", result["current_station"])
-        print("Station code:", result["station_code"])
-        print("Current delay:", result["current_delay"], "minutes")
-        print("Predicted final delay:", result["predicted_delay"], "minutes")
-        print("Expected arrival time:", result["expected_arrival"])
+    main()

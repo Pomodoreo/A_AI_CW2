@@ -1,11 +1,17 @@
+#print("STARTING MODEL FILE...", flush=True)
+
 import pickle
 from pathlib import Path
 
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 
 DATA_FOLDER = "data"
@@ -94,12 +100,12 @@ def load_train_data():
         path = Path(DATA_FOLDER) / file
 
         if not path.exists():
-            print("Missing file:", file)
+            print("Missing file:", file, flush=True)
             continue
-        
-        print("Reading file...")
+
+        print("Reading file:", file, flush=True)
         df = pd.read_excel(path)
-        print("Finished:", file)
+        print("Finished:", file, flush=True)
 
         df.columns = [
             str(col).lower().strip().replace(" ", "_")
@@ -187,18 +193,52 @@ def prepare_training_data(df):
     return clean_df
 
 
-# This Trains, evaluates, retrains on all data and saves the model
+# Testing models
+def get_models():
+    return {
+        "KNN k=3": make_pipeline(
+            StandardScaler(),
+            KNeighborsRegressor(n_neighbors=3)
+        ),
+
+        "KNN k=5": make_pipeline(
+            StandardScaler(),
+            KNeighborsRegressor(n_neighbors=5)
+        ),
+
+        "KNN k=7": make_pipeline(
+            StandardScaler(),
+            KNeighborsRegressor(n_neighbors=7)
+        ),
+
+        "Decision Tree": DecisionTreeRegressor(
+            random_state=42,
+            max_depth=12
+        ),
+
+        "MLP Neural Network": make_pipeline(
+            StandardScaler(),
+            MLPRegressor(
+                hidden_layer_sizes=(20,),
+                max_iter=300,
+                random_state=42
+            )
+        )
+    }
+
+
+# Trains, tests, selects the best model and saves it
 def train_delay_model():
     Path(MODEL_FOLDER).mkdir(exist_ok=True)
 
     raw_data = load_train_data()
     train_data = prepare_training_data(raw_data)
 
-    print("\nTraining rows:", len(train_data))
-    print(train_data.head())
+    print("\nTraining rows:", len(train_data), flush=True)
+    print(train_data.head(), flush=True)
 
     if len(train_data) == 0:
-        print("No training rows found.")
+        print("No training rows found.", flush=True)
         return
 
     route_encoder = LabelEncoder()
@@ -223,24 +263,37 @@ def train_delay_model():
         random_state=42
     )
 
-    model = RandomForestRegressor(
-        n_estimators=100,
-        random_state=42
-    )
+    best_model = None
+    best_model_name = ""
+    best_error = None
 
-    model.fit(X_train, y_train)
+    for model_name, model in get_models().items():
+        print("\nTesting model:", model_name, flush=True)
 
-    predictions = model.predict(X_test)
-    error = mean_absolute_error(y_test, predictions)
+        model.fit(X_train, y_train)
 
-    print("\nModel trained successfully")
-    print("Average error in minutes:", round(error, 2))
+        predictions = model.predict(X_test)
+        error = mean_absolute_error(y_test, predictions)
+
+        print("Average error in minutes:", round(error, 2), flush=True)
+
+        if best_error is None or error < best_error:
+            best_error = error
+            best_model = model
+            best_model_name = model_name
+
+    model = best_model
+
+    print("\nBest model:", best_model_name, flush=True)
+    print("Best average error in minutes:", round(best_error, 2), flush=True)
 
     # Trains again on all available data before saving the final model
     model.fit(X, y)
 
     saved_data = {
         "model": model,
+        "model_name": best_model_name,
+        "average_error": round(best_error, 2),
         "route_encoder": route_encoder,
         "location_encoder": location_encoder
     }
@@ -248,8 +301,9 @@ def train_delay_model():
     with open(MODEL_FILE, "wb") as file:
         pickle.dump(saved_data, file)
 
-    print("Final model trained on all data")
-    print("Model saved to:", MODEL_FILE)
+    print("Final model trained on all data", flush=True)
+    print("Model saved to:", MODEL_FILE, flush=True)
+    print("Saved model type:", best_model_name, flush=True)
 
 
 # Predicts final delay using general journey information
