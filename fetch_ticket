@@ -158,7 +158,7 @@ class TrainBooker(KnowledgeEngine):
             )
 
     # Outbound time
-    # Test case example: "hoping to depart before 10am"
+    # Test case example: "hoping to depart before 9am"
     # Asking for it explicitly covers this particular scenario
     @Rule(
         Session(
@@ -193,7 +193,7 @@ class TrainBooker(KnowledgeEngine):
             )
 
     # Return time (return / open return tickets only)
-    # Test case example: "come back from Oxford in the afternoon"
+    # Test case example: "come back from Durham in the afternoon"
     @Rule(
         Session(
             ticket=MATCH.t & P(is_return_ticket),
@@ -433,10 +433,10 @@ def fetch_ticket(journey):
 
     # apply time filters (your coursework requirement)
     if journey.get("time") == "before":
-        parsed = [j for j in parsed if j["departure"].hour < 10]
+        parsed = [j for j in parsed if j["departure"].hour < 9]
 
     if journey.get("return_time") == "after":
-        parsed = [j for j in parsed if j["departure"].hour >= 14]
+        parsed = [j for j in parsed if j["departure"].hour >= 16]
 
     if not parsed:
         return "BOT: No trains match your time preference."
