@@ -22,7 +22,7 @@ service = client.create_service(
        
 origin = 'WEH'
 dest = 'UPM'
-out_dt = datetime(2026, 5, 5, 15, 30, tzinfo=timezone.utc)
+out_dt = datetime(2026, 5, 27, 15, 30, tzinfo=timezone.utc)
 fare_class = 'STANDARD'
 response = {
     'origin': {'stationCRS': origin},
@@ -40,6 +40,7 @@ response_print = client.service.RealtimeJourneyPlan(**response)
 print(response_print)
 
 def get_journeys(origin, dest, departure_dt):
+    print(f"Fetching journeys from {origin} to {dest} departing at {departure_dt.isoformat()}...")
 
     response = client.service.RealtimeJourneyPlan(
         origin={'stationCRS': origin},
@@ -52,6 +53,7 @@ def get_journeys(origin, dest, departure_dt):
         },
         directTrains=True,
     )
+    print(response)
 
     return response.outwardJourney
 

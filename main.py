@@ -454,7 +454,43 @@ if __name__ == "__main__":
 def process_input(user_input, journey):
     from nlp import check_ticket, extract_date_info, extract_destination_info, extract_time_info
     from reasoning import get_response
+    # Use the production delay handler implementation.
+    from delay_handler_final import start_delay_prediction, handle_delay_input, DelaySession
 
+    # Check for /delay command to override normal booking flow
+    if user_input.strip().lower().startswith('/delay'):
+        # Initialize delay session if not already in delay mode
+        if not hasattr(process_input, 'delay_session') or process_input.delay_session is None:
+            process_input.delay_session = DelaySession()
+            return start_delay_prediction()
+        
+        # If just "/delay" with no additional input, restart
+        if user_input.strip().lower() == '/delay':
+            process_input.delay_session = DelaySession()
+            return start_delay_prediction()
+        
+        # Process the delay command (flexible - no strict stages)
+        response = handle_delay_input(user_input[6:].strip(), process_input.delay_session)
+        
+        # Check if prediction is complete and ready to reset
+        if process_input.delay_session.is_complete():
+            # After showing result, we'll reset on next non-/delay input or explicit /delay
+            pass
+        
+        return response
+    
+    # If in delay mode and user input doesn't start with /delay, process their input flexibly
+    if hasattr(process_input, 'delay_session') and process_input.delay_session is not None:
+        response = handle_delay_input(user_input, process_input.delay_session)
+        
+        # If complete, show result and don't reset yet - let user decide next action
+        return response
+    
+    # If we're exiting delay mode, reset it
+    if hasattr(process_input, 'delay_session'):
+        process_input.delay_session = None
+
+    # Normal booking flow
     ticket = check_ticket(user_input)
     dest_info = extract_destination_info(user_input, journey)
     date_info = extract_date_info(user_input, journey)
