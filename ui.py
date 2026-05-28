@@ -201,6 +201,9 @@ class ChatbotUI(QWidget):
 
     # Chat handling
     def add_message(self, text, is_user):
+        #if text is multiple strings, join them with newlines
+        if isinstance(text, tuple):
+            text = text[1]
         bubble = ChatBubble(text, is_user)
         self.chat_box.insertWidget(self.chat_box.count() - 1, bubble)
 

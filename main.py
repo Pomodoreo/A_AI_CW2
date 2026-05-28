@@ -17,7 +17,7 @@ import collections
 import collections.abc
 collections.Mapping = collections.abc.Mapping
 
-from nlp import check_ticket, extract_date_info, extract_destination_info, extract_time_info
+from nlp_enhanced import process_input_enhanced
 from reasoning import get_response
 from ticket import get_journeys, parse_journeys, find_cheapest
 
@@ -397,10 +397,7 @@ def run_chatbot():
         # -------------------------
         # CALL YOUR FUNCTIONS
         # -------------------------
-        ticket = check_ticket(user_input)
-        dest_info = extract_destination_info(user_input, journey)
-        date_info = extract_date_info(user_input, journey)
-        time_info = extract_time_info(user_input, journey)  # NEW
+        ticket, dest_info, date_info, time_info = process_input_enhanced(user_input, journey)
 
         # -------------------------
         # UPDATE STATE CAREFULLY
@@ -452,8 +449,6 @@ if __name__ == "__main__":
     run_chatbot()
     
 def process_input(user_input, journey):
-    from nlp import check_ticket, extract_date_info, extract_destination_info, extract_time_info
-    from reasoning import get_response
     # Use the production delay handler implementation.
     from delay_handler_final import start_delay_prediction, handle_delay_input, DelaySession
 
@@ -491,10 +486,7 @@ def process_input(user_input, journey):
         process_input.delay_session = None
 
     # Normal booking flow
-    ticket = check_ticket(user_input)
-    dest_info = extract_destination_info(user_input, journey)
-    date_info = extract_date_info(user_input, journey)
-    time_info = extract_time_info(user_input, journey)  # NEW
+    ticket, dest_info, date_info, time_info = process_input_enhanced(user_input, journey)
 
     if ticket:
         journey["ticket_type"] = ticket
