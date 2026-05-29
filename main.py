@@ -467,10 +467,16 @@ def process_input(user_input, journey):
         # Process the delay command (flexible - no strict stages)
         response = handle_delay_input(user_input[6:].strip(), process_input.delay_session)
         
+        # Check if user is exiting delay mode
+        if isinstance(response, tuple) and len(response) >= 1 and response[0] == "EXIT_DELAY_MODE":
+            process_input.delay_session = None
+            return response[1]  # Return just the message, not the tuple
+        
         # Check if prediction is complete and ready to reset
         if process_input.delay_session.is_complete():
             # After showing result, we'll reset on next non-/delay input or explicit /delay
-            pass
+            #Go back to booking mode immietely after showing result, no need to wait for next input
+            process_input.delay_session = None
         
         return response
     
@@ -478,7 +484,15 @@ def process_input(user_input, journey):
     if hasattr(process_input, 'delay_session') and process_input.delay_session is not None:
         response = handle_delay_input(user_input, process_input.delay_session)
         
+        # Check if user is exiting delay mode
+        if isinstance(response, tuple) and len(response) >= 1 and response[0] == "EXIT_DELAY_MODE":
+            process_input.delay_session = None
+            return response[1]  # Return just the message, not the tuple
+        
         # If complete, show result and don't reset yet - let user decide next action
+        #On second thought, let's reset immediately and go back to booking mode after showing the result, no need to wait for next input. This is simpler and more intuitive.
+        if process_input.delay_session.is_complete():
+            process_input.delay_session = None
         return response
     
     # If we're exiting delay mode, reset it

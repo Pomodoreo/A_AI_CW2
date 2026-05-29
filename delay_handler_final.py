@@ -342,13 +342,13 @@ def build_guidance_prompt(session, missing):
     # Acknowledge what we got
     if session.from_station or session.to_station or session.planned_arrival_time or session.current_delay is not None:
         if session.from_station:
-            responses.append(f"[OK] Current station: {session.from_station}")
+            responses.append(f"Current station: {session.from_station}\n")
         if session.to_station:
-            responses.append(f"[OK] Destination: {session.to_station}")
+            responses.append(f"Destination: {session.to_station}\n")
         if session.planned_arrival_time:
-            responses.append(f"[OK] Planned arrival: {format_time_display(session.planned_arrival_time)}")
+            responses.append(f"Planned arrival: {format_time_display(session.planned_arrival_time)}\n")
         if session.current_delay is not None:
-            responses.append(f"[OK] Current delay: {session.current_delay} min")
+            responses.append(f"Current delay: {session.current_delay} min\n")
         responses.append("")
     
     # Ask for first missing item
@@ -500,16 +500,10 @@ def format_time_display(time_str):
 def start_delay_prediction():
     """Return initial greeting."""
     return (
-        "TRAIN DELAY PREDICTION\n"
-        "======================\n\n"
         "I'll predict your train's arrival time based on current delays.\n"
         "This service supports the Weymouth-London Waterloo line.\n\n"
-        "Tell me (all at once or piece by piece):\n"
-        "  - Where you are now\n"
-        "  - Where you're going\n"
-        "  - Your planned arrival time\n"
-        "  - How much delay you currently have\n\n"
         "Example: 'from Southampton to London at 15:45, delayed 12 minutes'\n\n"
+        "\n"
         "Q: What is your starting station?\n"
         "   (Type 'exit' or 'quit' to leave delay mode)"
     )

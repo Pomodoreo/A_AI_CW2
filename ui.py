@@ -205,6 +205,12 @@ class ChatbotUI(QWidget):
         if isinstance(text, tuple):
             text = text[1]
         bubble = ChatBubble(text, is_user)
+        
+        # if isinstance(text, tuple) and text[0] == "EXIT_DELAY_MODE":
+        #     bubble = ChatBubble(text, is_user)
+        # else:
+        #     bubble = ChatBubble(text[1], is_user)
+
         self.chat_box.insertWidget(self.chat_box.count() - 1, bubble)
 
         # auto scroll
